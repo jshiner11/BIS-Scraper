@@ -6,6 +6,7 @@ from typing import List, Dict, Optional
 import time
 import re
 import os
+import random
 from datetime import datetime, timedelta
 
 # Configure logging
@@ -31,14 +32,56 @@ class BISScraper:
             'Accept-Language': 'en-US,en;q=0.5',
             'Referer': 'https://a810-bisweb.nyc.gov/bisweb/bispi00.jsp'
         }
-        self.session = requests.Session()
-        self.session.headers.update(self.headers)
+        self.session = self._create_session()
         self.batch_size = batch_size
         self.save_interval = save_interval
         self.start_time = None
         self.processed_count = 0
         self.error_count = 0
         self.last_save_time = None
+        self.consecutive_queues = 0
+        self.last_request_time = None
+        self.min_delay = 1.0  # Minimum delay between requests
+        self.max_delay = 3.0  # Maximum delay between requests
+        self.session_rotation_interval = 50  # Rotate session every 50 requests
+
+    def _create_session(self) -> requests.Session:
+        """Create a new session with randomized headers."""
+        session = requests.Session()
+        headers = self.headers.copy()
+        # Add some variation to the User-Agent
+        headers['User-Agent'] = f"Mozilla/5.0 (Macintosh; Intel Mac OS X 10_{random.randint(12, 15)}_{random.randint(0, 7)}) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{random.randint(90, 120)}.0.{random.randint(1000, 9999)}.{random.randint(100, 999)} Safari/537.36"
+        session.headers.update(headers)
+        return session
+
+    def _rotate_session(self):
+        """Rotate the session to avoid potential session-based rate limiting."""
+        self.session = self._create_session()
+        logger.info("Rotated session to avoid rate limiting")
+
+    def _calculate_delay(self) -> float:
+        """Calculate delay with jitter and progressive backoff."""
+        base_delay = self.min_delay
+        
+        # Add progressive backoff based on consecutive queues
+        if self.consecutive_queues > 0:
+            base_delay *= (1 + self.consecutive_queues * 0.5)
+        
+        # Add random jitter
+        jitter = random.uniform(0, 0.5)
+        delay = min(base_delay + jitter, self.max_delay)
+        
+        return delay
+
+    def _wait_between_requests(self):
+        """Wait between requests with calculated delay."""
+        if self.last_request_time:
+            elapsed = time.time() - self.last_request_time
+            if elapsed < self.min_delay:
+                delay = self._calculate_delay()
+                logger.debug(f"Waiting {delay:.2f} seconds between requests")
+                time.sleep(delay)
+        self.last_request_time = time.time()
 
     def load_progress(self, progress_file: str) -> set:
         """Load already processed BBLs from progress file."""
@@ -201,27 +244,39 @@ class BISScraper:
 
     def fetch_page(self, url: str, max_retries: int = 5, retry_delay: int = 6) -> Optional[str]:
         """
-        Fetch a web page and return its content, handling queue system.
+        Fetch a web page and return its content, handling queue system with improved rate limiting.
         
         Args:
             url (str): The URL to fetch
             max_retries (int): Maximum number of retries for queued requests
-            retry_delay (int): Delay in seconds between retries
+            retry_delay (int): Base delay in seconds between retries
             
         Returns:
             Optional[str]: The HTML content if successful, None otherwise
         """
         try:
             for attempt in range(max_retries):
+                self._wait_between_requests()
+                
+                # Rotate session periodically
+                if self.processed_count % self.session_rotation_interval == 0:
+                    self._rotate_session()
+                
                 logger.info(f"Fetching URL (attempt {attempt + 1}/{max_retries}): {url}")
                 response = self.session.get(url)
                 response.raise_for_status()
                 
                 if self.is_queue_page(response.text):
-                    logger.info("Request is in queue, waiting...")
-                    time.sleep(retry_delay)
+                    self.consecutive_queues += 1
+                    logger.info(f"Request is in queue, waiting... (Consecutive queues: {self.consecutive_queues})")
+                    
+                    # Progressive backoff for queue delays
+                    actual_delay = retry_delay * (1 + self.consecutive_queues * 0.5)
+                    time.sleep(actual_delay)
                     continue
                 
+                # Reset consecutive queues counter on success
+                self.consecutive_queues = 0
                 logger.info(f"Successfully fetched {url}")
                 return response.text
                 
@@ -454,10 +509,11 @@ def main():
     scraper = BISScraper()
     
     # Process BBLs from input CSV
-    input_csv = 'input_bbls.csv'  # CSV file containing BBLs
-    output_csv = 'property_data.csv'
+    input_csv = 'data/input/input_bbls.csv'  # CSV file containing BBLs
+    output_csv = 'data/output/property_data.csv'
+    progress_file = 'data/output/processed_bbls.txt'
     
-    scraper.process_bbls_from_csv(input_csv, output_csv)
+    scraper.process_bbls_from_csv(input_csv, output_csv, progress_file)
 
 if __name__ == "__main__":
     main() 
