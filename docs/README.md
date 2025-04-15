@@ -1,4 +1,4 @@
-# BIS Scraper
+# DOB BIS Scraper
 
 A web scraper for extracting property data from the NYC Department of Buildings Building Information System (BIS) website.
 
