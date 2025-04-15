@@ -4,9 +4,6 @@ __pycache__/
 *$py.class
 *.so
 .Python
-venv/
-ENV/
-env/
 build/
 develop-eggs/
 dist/
@@ -23,10 +20,10 @@ wheels/
 .installed.cfg
 *.egg
 
-# Project specific
-detail_page.html
-search_results.html
-processed_bbls.txt
+# Virtual Environment
+venv/
+ENV/
+env/
 
 # IDE
 .idea/
@@ -34,8 +31,20 @@ processed_bbls.txt
 *.swp
 *.swo
 
-# OS
+# Misc
 .DS_Store
+.env
+*.log
+
+# Project specific
+property_data.csv
+
+# Project specific
+detail_page.html
+search_results.html
+processed_bbls.txt
+
+# OS
 .DS_Store?
 ._*
 .Spotlight-V100
