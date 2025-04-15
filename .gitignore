@@ -37,12 +37,11 @@ env/
 *.log
 
 # Project specific
-property_data.csv
-
-# Project specific
-detail_page.html
-search_results.html
-processed_bbls.txt
+data/output/property_data.csv
+data/output/property_data.txt
+data/output/processed_bbls.txt
+temp/detail_page.html
+temp/search_results.html
 
 # OS
 .DS_Store?
