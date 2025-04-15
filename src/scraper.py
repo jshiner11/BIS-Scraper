@@ -415,9 +415,9 @@ class BISScraper:
         detail_html = self.fetch_page(profile_url)
         if detail_html:
             # Save the detail page for debugging
-            with open('detail_page.html', 'w') as f:
+            with open('temp/detail_page.html', 'w') as f:
                 f.write(detail_html)
-            logger.info("Saved detail page to detail_page.html")
+            logger.info("Saved detail page to temp/detail_page.html")
             
             data = self.parse_property_profile(detail_html)
             # Add BBL information
