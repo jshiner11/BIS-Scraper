@@ -138,68 +138,57 @@ class BISScraper:
             all_results = []
             current_batch = []
             
-            # Open text file in append mode
-            with open('property_data.txt', 'a') as txt_file:
-                for index, bbl in enumerate(df['BBL'], 1):
-                    bbl_str = str(bbl).zfill(10)
+            for index, bbl in enumerate(df['BBL'], 1):
+                bbl_str = str(bbl).zfill(10)
+                
+                # Skip if already processed
+                if bbl_str in processed_bbls:
+                    logger.info(f"Skipping already processed BBL {index} of {total_bbls}: {bbl_str}")
+                    continue
+                
+                try:
+                    logger.info(f"Processing BBL {index} of {total_bbls}: {bbl_str}")
+                    bbl_components = self.parse_bbl(bbl_str)
                     
-                    # Skip if already processed
-                    if bbl_str in processed_bbls:
-                        logger.info(f"Skipping already processed BBL {index} of {total_bbls}: {bbl_str}")
-                        continue
+                    # Add rate limiting
+                    if self.last_save_time:
+                        time_since_last = time.time() - self.last_save_time
+                        if time_since_last < 1.0:  # Wait at least 1 second between requests
+                            time.sleep(1.0 - time_since_last)
                     
-                    try:
-                        logger.info(f"Processing BBL {index} of {total_bbls}: {bbl_str}")
-                        bbl_components = self.parse_bbl(bbl_str)
+                    property_data = self.get_property_profile(
+                        borough=bbl_components['borough'],
+                        block=bbl_components['block'],
+                        lot=bbl_components['lot']
+                    )
+                    
+                    if property_data:
+                        current_batch.append(property_data)
+                        self.processed_count += 1
                         
-                        # Add rate limiting
-                        if self.last_save_time:
-                            time_since_last = time.time() - self.last_save_time
-                            if time_since_last < 1.0:  # Wait at least 1 second between requests
-                                time.sleep(1.0 - time_since_last)
+                        # Save progress
+                        self.save_progress(bbl_str, progress_file)
+                        self.last_save_time = time.time()
                         
-                        property_data = self.get_property_profile(
-                            borough=bbl_components['borough'],
-                            block=bbl_components['block'],
-                            lot=bbl_components['lot']
-                        )
+                        # Show progress periodically
+                        if self.processed_count % self.save_interval == 0:
+                            completion_time = self.estimate_completion_time(total_bbls)
+                            logger.info(f"Progress: {self.processed_count}/{total_bbls} BBLs processed")
+                            logger.info(f"Estimated completion time: {completion_time}")
+                            logger.info(f"Success rate: {(self.processed_count/(self.processed_count + self.error_count))*100:.2f}%")
                         
-                        if property_data:
-                            current_batch.append(property_data)
-                            self.processed_count += 1
-                            
-                            # Write to text file
-                            txt_file.write(f"\nBBL: {bbl_str}\n")
-                            txt_file.write("=" * 50 + "\n")
-                            txt_file.write(f"Primary Address: {property_data.get('Primary Address', 'N/A')}\n")
-                            txt_file.write(f"Secondary Addresses: {property_data.get('Secondary Addresses', 'N/A')}\n")
-                            txt_file.write(f"Borough: {property_data.get('Borough', 'N/A')}\n")
-                            txt_file.write(f"ZIP Code: {property_data.get('ZIP Code', 'N/A')}\n")
-                            txt_file.write("=" * 50 + "\n")
-                            
-                            # Save progress
-                            self.save_progress(bbl_str, progress_file)
-                            self.last_save_time = time.time()
-                            
-                            # Show progress periodically
-                            if self.processed_count % self.save_interval == 0:
-                                completion_time = self.estimate_completion_time(total_bbls)
-                                logger.info(f"Progress: {self.processed_count}/{total_bbls} BBLs processed")
-                                logger.info(f"Estimated completion time: {completion_time}")
-                                logger.info(f"Success rate: {(self.processed_count/(self.processed_count + self.error_count))*100:.2f}%")
-                            
-                            # Save batch periodically
-                            if len(current_batch) >= self.batch_size:
-                                self.save_batch(current_batch, output_csv)
-                                current_batch = []
-                        else:
-                            self.error_count += 1
-                            logger.warning(f"No data found for BBL: {bbl_str}")
-                            
-                    except Exception as e:
+                        # Save batch periodically
+                        if len(current_batch) >= self.batch_size:
+                            self.save_batch(current_batch, output_csv)
+                            current_batch = []
+                    else:
                         self.error_count += 1
-                        logger.error(f"Error processing BBL {bbl_str}: {str(e)}")
-                        continue
+                        logger.warning(f"No data found for BBL: {bbl_str}")
+                    
+                except Exception as e:
+                    self.error_count += 1
+                    logger.error(f"Error processing BBL {bbl_str}: {str(e)}")
+                    continue
             
             # Save any remaining results
             if current_batch:
@@ -451,38 +440,6 @@ class BISScraper:
             df = pd.DataFrame([data])
             df.to_csv(filename, index=False)
             logger.info(f"Data saved to {filename}")
-            
-            # Also save as readable text file
-            with open('property_data.txt', 'w') as f:
-                # Write BBL information
-                f.write("BBL Information:\n")
-                for key in ['Borough Code', 'Block', 'Lot']:
-                    if key in data:
-                        f.write(f"{key}: {data[key]}\n")
-                
-                # Write BIN
-                if 'BIN' in data:
-                    f.write(f"BIN: {data['BIN']}\n")
-                
-                # Write address information
-                f.write("\nAddress Information:\n")
-                if 'Primary Address' in data:
-                    f.write(f"Primary Address: {data['Primary Address']}\n")
-                if 'Secondary Addresses' in data:
-                    f.write(f"Secondary Addresses: {data['Secondary Addresses']}\n")
-                if 'Borough' in data:
-                    f.write(f"Borough: {data['Borough']}\n")
-                if 'ZIP Code' in data:
-                    f.write(f"ZIP Code: {data['ZIP Code']}\n")
-                
-                f.write("\nBuilding Information:\n")
-                # Write the rest of the information
-                skip_keys = ['Borough Code', 'Block', 'Lot', 'BIN', 'Primary Address', 
-                           'Secondary Addresses', 'Borough', 'ZIP Code']
-                for key, value in data.items():
-                    if key not in skip_keys:
-                        f.write(f"{key}: {value}\n")
-            logger.info("Data also saved to property_data.txt")
         except Exception as e:
             logger.error(f"Error saving data: {str(e)}")
 

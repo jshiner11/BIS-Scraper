@@ -12,9 +12,8 @@ BIS-Scraper/
 │   ├── input/            # Input files
 │   │   └── input_bbls.csv
 │   └── output/           # Output files
-│       ├── property_data.csv    # Machine-readable data
-│       ├── property_data.txt    # Human-readable formatted data
-│       └── processed_bbls.txt   # Tracking file for processed BBLs
+│       ├── property_data.csv    # Scraped property data in CSV format
+│       └── processed_bbls.txt   # Track processed BBLs
 ├── temp/                  # Temporary files
 │   ├── detail_page.html
 │   └── search_results.html
@@ -55,15 +54,13 @@ python src/scraper.py
 
 The scraper will:
 - Process each BBL from the input file
-- Save detailed property information in `data/output/property_data.txt`
-- Save structured data in `data/output/property_data.csv`
+- Save detailed property information in `data/output/property_data.csv`
 - Track processed BBLs in `data/output/processed_bbls.txt`
 
 ## Output Files
 
-- `property_data.txt`: Human-readable formatted output with detailed property information
-- `property_data.csv`: Machine-readable structured data in CSV format
-- `processed_bbls.txt`: Tracks which BBLs have been processed
+- `property_data.csv`: CSV file containing all scraped property data
+- `processed_bbls.txt`: Text file tracking which BBLs have been processed
 
 ## Dependencies
 
