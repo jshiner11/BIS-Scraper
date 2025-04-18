@@ -40,6 +40,9 @@ env/
 data/output/property_data.csv
 data/output/property_data.txt
 data/output/processed_bbls.txt
+data/output/property_data_batch_*.csv
+data/output/processed_bbls_batch_*.txt
+logs/
 temp/detail_page.html
 temp/search_results.html
 
