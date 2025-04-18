@@ -7,23 +7,45 @@ A web scraper for extracting property data from the NYC Department of Buildings 
 ```
 BIS-Scraper/
 ├── src/                    # Source code
-│   └── scraper.py         # Main scraper implementation
+│   ├── scraper.py         # Main scraper implementation
+│   ├── process_batches.py # Batch processing script
+│   ├── combine_batches.py # Data combination script
+│   ├── check_duplicates.py # Data validation script
+│   ├── split_bbls.py     # Input preparation script
+│   └── clean_input.py    # Input cleaning script
 ├── data/                  # Data files
 │   ├── input/            # Input files
-│   │   └── input_bbls.csv
-│   └── output/           # Output files
-│       ├── property_data.csv    # Scraped property data in CSV format
-│       └── processed_bbls.txt   # Track processed BBLs
-├── temp/                  # Temporary files
-│   ├── detail_page.html
-│   └── search_results.html
-├── docs/                  # Documentation
+│   │   ├── input_bbls.csv
+│   │   └── batches/     # Split batch files
+│   └── output/          # Output files
+│       ├── property_data_batch_*.csv  # Individual batch results
+│       ├── property_data_combined.csv # Combined results
+│       └── processed_bbls_batch_*.txt # Progress tracking
+├── logs/                 # Log files
+├── temp/                 # Temporary files
+├── docs/                 # Documentation
 │   └── README.md
-├── tests/                # Test files
+├── tests/               # Test files
 ├── .gitignore
 ├── requirements.txt
-└── venv/                 # Virtual environment
+└── venv/                # Virtual environment
 ```
+
+## Why Batch Processing?
+
+The scraper uses a batch processing approach for several important reasons:
+
+1. **Rate Limiting**: The BIS website has rate limiting to prevent excessive requests. Processing in batches with delays between them helps avoid being blocked.
+
+2. **Error Recovery**: If an error occurs, we only need to reprocess the affected batch rather than starting over from the beginning.
+
+3. **Progress Tracking**: Each batch maintains its own progress file, making it easier to track and resume processing if interrupted.
+
+4. **Memory Management**: Processing large numbers of BBLs in smaller batches is more memory-efficient.
+
+5. **Parallel Processing**: The batch structure allows for potential parallel processing in the future if needed.
+
+6. **Data Integrity**: Each batch's results are saved independently, reducing the risk of data loss if something goes wrong.
 
 ## Installation
 
@@ -46,21 +68,48 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. Prepare your input BBLs in `data/input/input_bbls.csv`
-2. Run the scraper:
+### 1. Prepare Input Data
+
+1. Place your BBLs in `data/input/input_bbls.csv`
+2. Split the input into batches:
 ```bash
-python src/scraper.py
+python src/split_bbls.py
 ```
 
-The scraper will:
-- Process each BBL from the input file
-- Save detailed property information in `data/output/property_data.csv`
-- Track processed BBLs in `data/output/processed_bbls.txt`
+### 2. Process Batches
+
+Run the batch processor:
+```bash
+python src/process_batches.py
+```
+
+The script will:
+- Process each batch sequentially
+- Save results in `data/output/property_data_batch_*.csv`
+- Track progress in `data/output/processed_bbls_batch_*.txt`
+- Wait 5 minutes between batches to avoid rate limiting
+
+### 3. Combine Results
+
+After all batches are processed, combine the results:
+```bash
+python src/combine_batches.py
+```
+
+This will create `data/output/property_data_combined.csv` with all unique BBLs.
+
+### 4. Check for Duplicates
+
+To verify data integrity:
+```bash
+python src/check_duplicates.py
+```
 
 ## Output Files
 
-- `property_data.csv`: CSV file containing all scraped property data
-- `processed_bbls.txt`: Text file tracking which BBLs have been processed
+- `property_data_batch_*.csv`: Individual batch results
+- `property_data_combined.csv`: Combined results from all batches
+- `processed_bbls_batch_*.txt`: Progress tracking for each batch
 
 ## Dependencies
 
